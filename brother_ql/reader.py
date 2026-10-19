@@ -227,9 +227,15 @@ def chunker(data, raise_exception=False):
         num_bytes = len(opcode)
         if opcode_def[1] > 0: num_bytes += opcode_def[1]
         elif opcode_def[0] in ('raster QL', '2-color raster QL'):
+            if len(data) < 3:
+                raise ValueError('Truncated raster instruction header')
             num_bytes += data[2] + 2
         elif opcode_def[0] in ('raster P-touch',):
+            if len(data) < 3:
+                raise ValueError('Truncated raster instruction header')
             num_bytes += data[1] + data[2]*256 + 2
+        if len(data) < num_bytes:
+            raise ValueError(f'Truncated {opcode_def[0]} instruction')
         #payload = data[len(opcode):num_bytes]
         instructions.append(data[:num_bytes])
         yield instructions[-1]
@@ -238,15 +244,16 @@ def chunker(data, raise_exception=False):
 
 def match_opcode(data):
     matching_opcodes = [opcode for opcode in OPCODES.keys() if data.startswith(opcode)]
-    assert len(matching_opcodes) == 1
+    if len(matching_opcodes) != 1:
+        raise KeyError(f'Unknown opcode: {hex_format(data[:4])}')
     return matching_opcodes[0]
 
 def interpret_response(data):
     data = bytes(data)
     if len(data) < 32:
-        raise NameError('Insufficient amount of data received', hex_format(data))
+        raise ValueError('Insufficient amount of data received', hex_format(data))
     if not data.startswith(b'\x80\x20\x42'):
-        raise NameError("Printer response doesn't start with the usual header (80:20:42)", hex_format(data))
+        raise ValueError("Printer response doesn't start with the usual header (80:20:42)", hex_format(data))
     for i, byte_name in enumerate(RESP_BYTE_NAMES):
         logger.debug('Byte %2d %24s %02X', i, byte_name+':', data[i])
     series_code = data[3]
@@ -277,6 +284,7 @@ def interpret_response(data):
     media_code = data[11]
     media_sensor = data[14]
     media_category = ""
+    media_type = f"Unknown (0x{media_code:02X})"
     if media_code in RESP_MEDIA_TYPES:
         media_type = RESP_MEDIA_TYPES[media_code]
         media_category = RESP_MEDIA_CATEGORIES[media_code]
@@ -289,10 +297,11 @@ def interpret_response(data):
     tape_color = ''
     text_color = ''
     if model.startswith('PT'):
-        tape_color = RESP_TAPE_COLORS[tape_color_code]
-        text_color = RESP_TEXT_COLORS[text_color_code]
+        tape_color = RESP_TAPE_COLORS.get(tape_color_code, f"Unknown (0x{tape_color_code:02X})")
+        text_color = RESP_TEXT_COLORS.get(text_color_code, f"Unknown (0x{text_color_code:02X})")
 
     status_code = data[18]
+    status_type = f"Unknown (0x{status_code:02X})"
     if status_code in RESP_STATUS_TYPES:
         status_type = RESP_STATUS_TYPES[status_code]
         logger.debug("Status type: %s", status_type)
@@ -300,7 +309,7 @@ def interpret_response(data):
         logger.error("Unknown status type %02X", status_code)
 
     phase_code = data[19]
-    phase_type = ''
+    phase_type = f"Unknown (0x{phase_code:02X})"
     if phase_code in RESP_PHASE_TYPES:
         phase_type = RESP_PHASE_TYPES[phase_code]
         logger.debug("Phase type: %s", phase_type)
@@ -322,6 +331,7 @@ def interpret_response(data):
       'phase_type': phase_type,
       'phase_code': phase_code,
       'media_type': media_type,
+      'media_code': media_code,
       'media_category': media_category,
       'media_sensor': media_sensor,
       'tape_color': tape_color,
@@ -474,3 +484,30 @@ class BrotherQLReader(object):
                         im.save(img_name)
                         print('Page saved as {}'.format(img_name))
                         self.page_counter += 1
+
+
+class StatusReader:
+    """Frame status replies across reads, preserving coalesced packets.
+
+    One reader must own a transport's reply stream. Invalid framing fails closed;
+    payload bytes are never scanned for a possible replacement header.
+    """
+
+    def __init__(self, printer):
+        self.printer = printer
+        self.pending = bytearray()
+
+    def read(self, deadline):
+        import time
+
+        while time.monotonic() < deadline:
+            if len(self.pending) >= 32:
+                packet = bytes(self.pending[:32])
+                del self.pending[:32]
+                return interpret_response(packet)
+            data = self.printer.read(32)
+            if data:
+                self.pending.extend(data)
+            else:
+                time.sleep(0.005)
+        raise TimeoutError("No complete printer status received before deadline")

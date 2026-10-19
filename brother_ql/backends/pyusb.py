@@ -9,7 +9,6 @@ Install via `pip install pyusb`
 """
 
 import time
-import sys
 import usb.core
 import usb.util
 import logging
@@ -89,6 +88,7 @@ class BrotherQLBackendPyUSB(BrotherQLBackendGeneric):
         """
 
         self.dev = None
+        self.was_kernel_driver_active = False
         self.read_timeout =    10. # ms
         self.write_timeout = 15000. # ms
         # strategy : try_twice or select
@@ -101,7 +101,8 @@ class BrotherQLBackendPyUSB(BrotherQLBackendGeneric):
             vendor, product = int(vendor, 16), int(product, 16)
             for result in list_available_devices(ums_warning=False):
                 printer = result['instance']
-                if printer.idVendor == vendor and printer.idProduct == product or (serial and printer.iSerialNumber == serial):
+                if (printer.idVendor == vendor and printer.idProduct == product
+                        and (not serial or result['identifier'].split('://', 1)[-1].partition('/')[2] == serial)):
                     self.dev = printer
                     break
             if self.dev is None:
@@ -143,11 +144,14 @@ class BrotherQLBackendPyUSB(BrotherQLBackendGeneric):
             # re-attach kernel driver and exit gracefully if libusb reports errors
             logger.error(f"Cannot initialize device {device_specifier}: {e}")
             self.dispose()
-            sys.exit(1)
+            raise
 
     def _raw_read(self, length):
         # pyusb Device.read() operations return array() type - let's convert it to bytes()
-        return bytes(self.read_dev.read(length))
+        try:
+            return bytes(self.read_dev.read(length, timeout=max(1, int(self.read_timeout))))
+        except usb.core.USBTimeoutError:
+            return b''
 
     def _read(self, length=32):
         if self.strategy == 'try_twice':
@@ -158,29 +162,28 @@ class BrotherQLBackendPyUSB(BrotherQLBackendGeneric):
                 time.sleep(self.read_timeout/1000.)
                 return self._raw_read(length)
         elif self.strategy == 'select':
-            data = b''
-            start = time.time()
-            while (not data) and (time.time() - start < self.read_timeout/1000.):
-                result, _, _ = select.select([self.read_dev], [], [], 0)
-                if self.read_dev in result:
-                    data += self._raw_read(length)
-                if data: break
-                time.sleep(0.001)
-            if not data:
-                # one last try if still no data:
-                return self._raw_read(length)
-            else:
-                return data
+            # USB endpoints are not selectable file descriptors. A bounded bulk
+            # read provides the same polling behavior on every libusb platform.
+            return self._raw_read(length)
         else:
             raise NotImplementedError('Unknown strategy')
 
     def _write(self, data):
-        self.write_dev.write(data, int(self.write_timeout))
+        written = self.write_dev.write(data, int(self.write_timeout))
+        if written != len(data):
+            # Never resend a partial raster: some bytes may already be printing.
+            raise IOError(f'Short USB write: {written} of {len(data)} bytes')
 
     def _dispose(self):
-        usb.util.dispose_resources(self.dev)
-        del self.write_dev, self.read_dev
-        if self.was_kernel_driver_active:
-            logger.debug("Re-attaching kernel driver")
-            self.dev.attach_kernel_driver(0)
-        del self.dev
+        dev = self.dev
+        if dev is None:
+            return
+        self.dev = None
+        self.write_dev = self.read_dev = None
+        try:
+            usb.util.dispose_resources(dev)
+        finally:
+            if self.was_kernel_driver_active:
+                self.was_kernel_driver_active = False
+                logger.debug("Re-attaching kernel driver")
+                dev.attach_kernel_driver(0)
