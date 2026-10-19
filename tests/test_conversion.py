@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import packbits
 from PIL import Image
 from brother_ql.conversion import convert
+from brother_ql import create_label
 from brother_ql.print_queue import BrotherPrintQueue
 from brother_ql.raster import BrotherQLRaster
 from brother_ql.reader import chunker
@@ -55,3 +56,15 @@ class ConversionTests(unittest.TestCase):
                 rows.append([packbits.decode(p) if compress and raster.compression_support else p for p in payloads])
             self.assertTrue(rows[0] == rows[1], f"Raster pixels changed: {model}")
             self.assertEqual(len(rows[0]), height)
+
+    def test_legacy_create_label_populates_raster_buffer(self):
+        for model, label, size in [('QL-800', '29x90', (306, 991)),
+                                    ('QL-1110NWB', '102', (1164, 708))]:
+            with self.subTest(model=model):
+                image = Image.new('RGB', size, 'white')
+                raster = BrotherQLRaster(model)
+                create_label(raster, image, label, compress=True)
+                expected = convert(BrotherQLRaster(model), [image], label, compress=True)
+                self.assertEqual(len(raster.data), len(expected))
+                self.assertTrue(raster.data == expected)
+                self.assertTrue(raster.data.endswith(b'\x1a'))
