@@ -95,8 +95,9 @@ each experiment. The temporary probe pod was removed afterward.
   label passed through the durable API queues. Each reached `completed` after
   device acknowledgement. Wrong-stock jobs were rejected on both models, and
   status queries worked alongside normal queue processing.
-- Nine labels in total were confirmed by the devices. Visual quality, barcode
-  scanning, and ruler measurements have not been independently confirmed.
+- Nine labels in total were confirmed by the devices. Sam subsequently inspected
+  the output and reported that all labels printed well. Ruler measurements are
+  planned for tomorrow; barcode scanning remains unverified.
 - Sanitized raw replies from the initial probes are retained as hardware-free
   regression fixtures in `tests/fixtures/`. Full private traces remain outside Git
   under `~/.local/share/brother-ql-tests/` on the operator's Mac.
