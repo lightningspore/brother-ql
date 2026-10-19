@@ -1,6 +1,7 @@
 import logging
 from collections import deque
 import time
+import math
 
 from brother_ql.reader import StatusReader
 from brother_ql.conversion import queue_convert
@@ -12,7 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class BrotherPrintQueue:
-    def __init__(self, printer: BrotherQLBackendGeneric, rasterizer: BrotherQLRaster):
+    def __init__(self, printer: BrotherQLBackendGeneric, rasterizer: BrotherQLRaster,
+                 completion_timeout=30, ready_timeout=3, status_timeout=3):
+        for value in (completion_timeout, ready_timeout, status_timeout):
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError("Printer timeouts must be finite and positive")
+        self.completion_timeout = completion_timeout
+        self.ready_timeout = ready_timeout
+        self.status_timeout = status_timeout
         self._print_queue = deque()
         self._qlr = rasterizer
         self._printer = printer
@@ -49,7 +57,7 @@ class BrotherPrintQueue:
         self._printer.write(self._qlr.data)
         self._qlr.clear()
 
-        ready = self._validate_status(phase=0, request=True, timeout=2)
+        ready = self._validate_status(phase=0, request=True, timeout=self.status_timeout)
         self._printing = False
         self.ready = ready
 
@@ -100,9 +108,9 @@ class BrotherPrintQueue:
             self._printer.write(page_data)
             # A fast printer may omit a separately observed "started" phase.
             # Completion followed by readiness is sufficient; readiness alone isn't.
-            if not self._validate_status(status=1, timeout=10):
+            if not self._validate_status(status=1, timeout=self.completion_timeout):
                 return False
-            if not self._validate_status(status=6, phase=0, timeout=2):
+            if not self._validate_status(status=6, phase=0, timeout=self.ready_timeout):
                 return False
             self.uncertain = False
             self.ready = True
