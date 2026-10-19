@@ -2,7 +2,7 @@ import logging
 from collections import deque
 import time
 
-from brother_ql.reader import interpret_response
+from brother_ql.reader import StatusReader
 from brother_ql.conversion import queue_convert
 from brother_ql.raster import BrotherQLRaster
 from brother_ql.backends import BrotherQLBackendGeneric
@@ -17,6 +17,8 @@ class BrotherPrintQueue:
         self._qlr = rasterizer
         self._printer = printer
         self._printing = False
+        self.uncertain = False
+        self._responses = StatusReader(printer)
         self.status = None
         self.ready = False
         self.last_error = []
@@ -24,9 +26,17 @@ class BrotherPrintQueue:
         self.initialize()
 
     def clear(self):
+        """Discard pending pages and acknowledge any uncertain physical print."""
+        if self._printing:
+            raise RuntimeError("Can't clear images while printing")
         self._print_queue.clear()
+        self.page_count = 0
+        self.uncertain = False
 
     def initialize(self):
+        if self.uncertain:
+            raise RuntimeError("Check the physical label, then clear the queue before resetting")
+        self._responses.pending.clear()
         self._qlr.clear()
 
         # Standard init sequence
@@ -49,7 +59,7 @@ class BrotherPrintQueue:
         if self._printing:
             raise RuntimeError("Can't queue images while printing")
         # BrotherQLRaster page number starts from 0
-        self._qlr.page_number = len(self._print_queue) - 1
+        self._qlr.page_number = len(self._print_queue)
         page_data = queue_convert(qlr=self._qlr, **kwargs)
         for p in page_data:
             self._print_queue.append(p)
@@ -60,79 +70,45 @@ class BrotherPrintQueue:
         self.page_count = len(self._print_queue)
 
     def submit(self, clear_on_failure: bool = False):
+        """Submit once; an unconfirmed send requires physical inspection and clear()."""
+        if self.uncertain:
+            raise RuntimeError("Previous print is uncertain; check the label and clear the queue")
+        if self._printing:
+            raise RuntimeError("Already printing")
         if not self.ready:
-            logger.debug("Printing has failed previously, initializing printer")
             self.initialize()
+        if not self.ready:
+            return False
         self._printing = True
-        count = 0
-        qsize = len(self._print_queue)
-        logger.info(f"Submitting print queue with {qsize} pages")
-        completed = False
-        while len(self._print_queue) > 0:
-            logger.info(f"Submitting page {count+1} of {qsize}")
-            printed = self._submit_page()
-            count += 1
-            if not printed:
-                logger.warning("Page submission failed, giving up")
-                break
-
-        logger.debug("Queue processing complete")
-        remaining_pages = len(self._print_queue)
-
-        if remaining_pages != 0:
-            logger.debug(f"There are {remaining_pages} pages remaining in the queue")
-            if clear_on_failure:
-                logger.debug(f"Clearing queue with failed {remaining_pages} pages")
-                self._print_queue.clear()
-        else:
-            completed = True
-        self.ready = self._validate_status(phase=0, request=True, timeout=2)
-        if self.ready:
-            logger.debug("Printer is ready to receive data")
-        else:
-            logger.error("Printer is not ready")
-            logger.debug(self.status)
-
-        self._printing = False
-        return completed
+        try:
+            while self._print_queue:
+                if not self._submit_page():
+                    if clear_on_failure:
+                        self._print_queue.clear()
+                    return False
+            return True
+        finally:
+            self.page_count = len(self._print_queue)
+            self._printing = False
 
     def _submit_page(self):
-        page_data = self._print_queue[0]
-        completed = False
-
-        while not completed:
-            logger.debug(
-                f"Command data: {' '.join(map(lambda byte: f'{byte:02X}', page_data))}"
-            )
+        # Remove before writing: even a raising write may have transferred bytes.
+        page_data = self._print_queue.popleft()
+        self.uncertain = True
+        self.ready = False
+        try:
             self._printer.write(page_data)
-
-            sts_started = False
-            sts_printed = False
-            sts_ready = False
-            logger.debug("Waiting for the printer to start printing")
-            sts_started = self._validate_status(status=6, phase=1, timeout=2)
-            if sts_started:
-                logger.debug("Printing started, waiting for completion")
-                sts_printed = self._validate_status(status=1, phase=1)
-                if sts_printed:
-                    logger.debug("Printing completed, waiting for ready status")
-                    sts_ready = self._validate_status(status=6, phase=0, timeout=2)
-                    if sts_ready:
-                        logger.debug("Printer is ready to receive data")
-                else:
-                    logger.warning("Printing started but did not finish")
-            else:
-                logger.warning("Printing failed to start")
-
-            completed = sts_started and sts_printed and sts_ready
-            if completed:
-                # Remove printed page
-                self._print_queue.popleft()
-            else:
-                break
-
-        self.page_count = len(self._print_queue)
-        return completed
+            # A fast printer may omit a separately observed "started" phase.
+            # Completion followed by readiness is sufficient; readiness alone isn't.
+            if not self._validate_status(status=1, timeout=10):
+                return False
+            if not self._validate_status(status=6, phase=0, timeout=2):
+                return False
+            self.uncertain = False
+            self.ready = True
+            return True
+        finally:
+            self.page_count = len(self._print_queue)
 
     def _validate_status(
         self,
@@ -159,37 +135,21 @@ class BrotherPrintQueue:
                 f"Expecting status type 0x{status:02X}, phase type 0x{phase:02X}, timeout {timeout}s"
             )
 
-        start_time = time.time()
-        response = None
-        while time.time() - start_time < timeout:
-            data = self._printer.read()
-            if not data:
-                time.sleep(0.1)
-                continue
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             try:
-                response = interpret_response(data)
+                response = self._responses.read(deadline)
+            except TimeoutError:
                 break
-            except ValueError:
-                continue
-
-        match = False
-        if response is not None:
             self.status = response
-            if len(response["errors"]) > 0:
+            if response["errors"]:
                 self.last_error = response["errors"]
+                return False
             status_match = status == -1 or status == response["status_code"]
             phase_match = phase == -1 or phase == response["phase_code"]
-            match = status_match and phase_match
-            logger.debug(
-                f"Got status 0x{response['status_code']:02X}, phase 0x{response['phase_code']:02X}"
-            )
-            if match:
-                logger.debug("Response matches expected status")
-            else:
-                logger.debug("Response does not match expected status")
-        else:
-            logger.warning(
-                f"Did not receive a response from printer within {timeout} seconds"
-            )
-
-        return match
+            if status_match and phase_match:
+                self.last_error = []
+                return True
+            # Notifications and other phase changes can precede the expected reply.
+        logger.warning("Expected printer status not received within %s seconds", timeout)
+        return False
