@@ -1,15 +1,104 @@
-# brother_ql-inventree
+# Brother QL driver for SporePrint
 
-Python package for the raster language protocol of the Brother QL series label printers
+A separately maintained fork of [matmair/brother_ql-inventree](https://github.com/matmair/brother_ql-inventree),
+which derives from [pklaus/brother_ql](https://github.com/pklaus/brother_ql).
+The starting point is latest upstream master, `5364d30e0ad088fa943642a05863814390d52b4f`,
+including the changes after upstream's `1.4a0` alpha. Original authorship and GPLv3-or-later
+licensing are preserved. The upstream InvenTree repository is archived.
 
-## IN MAINTENANCE MODE
+The distribution is **`brother-ql-sporeprint`**, development version **1.4a1**.
+Python imports remain `brother_ql` and the CLI remains `brother_ql`.
+Use a separate virtual environment: this distribution shares import paths with
+`brother-ql` and `brother-ql-inventree`, so do not install them together.
+No release has been published to PyPI. The live SporePrint application still uses
+InvenTree 1.3; creating this fork does not change its dependency or deployment.
 
-This repo is provided as is. It works for the printers listed below with the latest version, I checked all of them personally.  
-I do not inteded to add or change anything unless something breaks.
+## Improvements in this fork
 
-## FORK NOTICE
+- USB selection requires vendor, product, and the requested serial descriptor to
+  match. It does not silently select another printer with the same product ID.
+- USB reads pass an explicit timeout; idle timeouts return empty bytes while real
+  transport failures propagate. The legacy `select` strategy uses a bounded USB
+  read because USB endpoint objects are not selectable file descriptors.
+- Partial writes raise without retry. Initialization errors raise exceptions rather
+  than terminating the embedding application. Cleanup is idempotent and attempts
+  to restore the kernel driver even if releasing USB resources fails.
+- Status decoding retains unknown media/status/phase codes instead of crashing;
+  unknown P-touch color codes also remain inspectable. Malformed responses raise
+  `ValueError`, matching the existing caller contract.
+- `StatusReader` buffers fragmented and coalesced 32-byte replies. Queue waits use
+  monotonic deadlines, skip intervening notifications, and reject error packets.
+- The print queue requires completion followed by readiness, without requiring an
+  observable separate start notification. The first queued page is correctly marked
+  as the first page rather than a subsequent page.
+- A page is removed before a write begins. A failed or unconfirmed send sets
+  `queue.uncertain` and blocks further submission/reset until the caller checks the
+  physical label and explicitly calls `clear()`. This discards remaining pages too;
+  requeue only what is actually needed. `clear_on_failure=True` does not acknowledge
+  uncertainty. Exceptions always release the queue's printing flag.
+- Legacy `send()` disposes the transport on success, failure, and early returns.
+  `get_status()` accepts fragmented replies and preserves parsing exceptions.
+- Raster analysis rejects truncated instructions and honors strict/permissive
+  handling of unknown opcodes instead of raising an unexpected assertion.
+- Packaging uses one authoritative metadata file. Environment diagnostics use
+  `importlib.metadata` instead of removed `pkg_resources`. CI tests/builds the fork;
+  the inherited automatic upstream PyPI publishing workflow has been removed.
 
-This is a fork of https://github.com/pklaus/brother_ql by [Philipp Klaus](https://github.com/pklaus).
+This is not a durable queue: uncertain state lives in memory. Applications must persist
+job state across process restarts (SporePrint already does), serialize access to each
+physical printer, and avoid automatically replaying jobs after a crash. Use one
+`StatusReader` per response stream. It preserves unread packets between calls and
+fails closed on malformed framing; it does not guess a new header inside payloads.
+Transport reads themselves must be bounded for a reader deadline to be effective.
+Queue objects are not thread-safe.
+
+## Development and validation
+
+Python 3.9 or newer is required. From this repository:
+
+```sh
+uv venv --python 3.13
+uv pip install --python .venv/bin/python -e . build
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m build
+.venv/bin/brother_ql --version
+.venv/bin/brother_ql info env
+```
+
+The hardware-free tests cover USB selection, timeouts, short writes, cleanup,
+status-code decoding, reply framing, uncertain sends, readiness/error handling,
+first-page flags, and raster generation for QL-800 and QL-1110NWB. Compression
+checks compare decoded raster rows with uncompressed output where supported.
+Passing these tests does not establish physical print quality or USB behavior on
+our printers. Before updating the app, test both printers with synthetic labels,
+confirm completion/readiness and stock mismatch handling, and inspect the labels.
+Do not consume postage or reuse a customer shipping label for driver experiments.
+
+## Brother software investigation
+
+Brother publishes a [QL-800 raster reference](https://download.brother.com/welcome/docp100278/cv_ql800_eng_raster_101.pdf)
+and a [QL-1110NWB manual index including its raster reference](https://support.brother.com/g/b/manualtop.aspx?c=us&lang=en&prod=lpql1110nwbeus).
+Its [QL-800 Linux downloads](https://support.brother.com/g/b/downloadlist.aspx?c=us_ot&lang=en&os=131&prod=lpql800eus)
+and [QL-1110NWB Linux downloads](https://support.brother.com/g/b/downloadlist.aspx?c=us&lang=en&os=130&prod=lpql1110nwbeus)
+also list CUPS wrapper source code. Wrapper source is not proof that the proprietary
+raster engine's source is available.
+
+The download indexes returned HTTP 403 during this investigation. No Brother binary
+has been obtained, executed, or decompiled, and no official command trace is claimed.
+The next comparison should use official packages and a synthetic pattern containing
+text, a barcode, borders, and alignment marks. Capture commands/replies with timings
+for each printer, changing one setting at a time (stock, cut, quality, compression,
+red/black where supported). Compare command sequences and reconstructed pixels before
+investigating specific undocumented behavior in native libraries. Keep downloaded
+vendor installers, binaries, and captures outside Git; record versions and checksums.
+USB ownership must remain exclusive: stop the relevant application worker deliberately
+before connecting a vendor driver to that physical printer, then restore it after the
+experiment. Do not attach a competing driver to the live queue.
+
+## Upstream model and label reference
+
+The following compatibility list is inherited from upstream. It is not a claim that
+this fork has physically revalidated every device.
 
 ## Verified models
 ### Verified devices

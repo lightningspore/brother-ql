@@ -23,7 +23,7 @@ printer_help = "The identifier for the printer. This could be a string like tcp:
 @click.option('-m', '--model', type=click.Choice(models), envvar='BROTHER_QL_MODEL')
 @click.option('-p', '--printer', metavar='PRINTER_IDENTIFIER', envvar='BROTHER_QL_PRINTER', help=printer_help)
 @click.option('--debug', is_flag=True)
-@click.version_option()
+@click.version_option(package_name="brother-ql-sporeprint")
 @click.pass_context
 def cli(ctx, *args, **kwargs):
     """ Command line interface for the brother_ql Python package. """
@@ -111,7 +111,8 @@ def env(ctx, *args, **kwargs):
     print debug info about running environment
     """
     import sys, platform, os, shutil
-    from pkg_resources import get_distribution, working_set
+    from importlib.metadata import distribution, PackageNotFoundError, version
+    import re
     print("\n##################\n")
     print("Information about the running environment of brother_ql.")
     print("(Please provide this information when reporting any issue.)\n")
@@ -125,8 +126,8 @@ def env(ctx, *args, **kwargs):
     print("  *", py_version)
     # brother_ql
     print("About the brother_ql package:")
-    pkg = get_distribution('brother_ql')
-    print("  * package location:", pkg.location)
+    pkg = distribution('brother-ql-sporeprint')
+    print("  * package location:", pkg.locate_file(''))
     print("  * package version: ", pkg.version)
     try:
         cli_loc = shutil.which('brother_ql')
@@ -138,13 +139,13 @@ def env(ctx, *args, **kwargs):
     fmt = "  {req:14s} | {spec:10s} | {ins_vers:17s}"
     print(fmt.format(req='requirement', spec='requested', ins_vers='installed version'))
     print(fmt.format(req='-' * 14, spec='-'*10, ins_vers='-'*17))
-    requirements = list(pkg.requires())
-    requirements.sort(key=lambda x: x.project_name)
-    for req in requirements:
-        proj = req.project_name
-        req_pkg = get_distribution(proj)
-        spec = ' '.join(req.specs[0]) if req.specs else 'any'
-        print(fmt.format(req=proj, spec=spec, ins_vers=req_pkg.version))
+    for requirement in sorted(pkg.requires or []):
+        proj = re.split(r"[<>=!~;\[ ]", requirement, maxsplit=1)[0]
+        try:
+            installed = version(proj)
+        except PackageNotFoundError:
+            installed = 'not installed (possibly conditional)'
+        print(fmt.format(req=proj, spec=requirement, ins_vers=installed))
     print("\n##################\n")
 
 @cli.command('print', short_help='Print a label')
