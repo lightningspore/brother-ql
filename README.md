@@ -10,8 +10,9 @@ The distribution is **`brother-ql-sporeprint`**, development version **1.4a1**.
 Python imports remain `brother_ql` and the CLI remains `brother_ql`.
 Use a separate virtual environment: this distribution shares import paths with
 `brother-ql` and `brother-ql-inventree`, so do not install them together.
-No release has been published to PyPI. The live SporePrint application still uses
-InvenTree 1.3; creating this fork does not change its dependency or deployment.
+No release has been published to PyPI. Both live SporePrint workers now pin this
+fork at `5c91577c0ca7e5d8c974e5bb67a3e568512f651f` through their uv lockfile.
+The separate application repository owns the deployment and durable queues.
 
 ## Improvements in this fork
 
@@ -40,6 +41,11 @@ InvenTree 1.3; creating this fork does not change its dependency or deployment.
   `get_status()` accepts fragmented replies and preserves parsing exceptions.
 - Raster analysis rejects truncated instructions and honors strict/permissive
   handling of unknown opcodes instead of raising an unexpected assertion.
+- The legacy `create_label()` wrapper populates `qlr.data` again. Upstream
+  conversion refactoring returned the bytes but discarded them in that wrapper;
+  tests now exercise actual raster output for both QL models.
+- Queue completion/readiness/status timeouts are configurable (30/3/3 seconds by
+  default), and must be finite and positive.
 - Packaging uses one authoritative metadata file. Environment diagnostics use
   `importlib.metadata` instead of removed `pkg_resources`. CI tests/builds the fork;
   the inherited automatic upstream PyPI publishing workflow has been removed.
@@ -69,10 +75,44 @@ The hardware-free tests cover USB selection, timeouts, short writes, cleanup,
 status-code decoding, reply framing, uncertain sends, readiness/error handling,
 first-page flags, and raster generation for QL-800 and QL-1110NWB. Compression
 checks compare decoded raster rows with uncompressed output where supported.
-Passing these tests does not establish physical print quality or USB behavior on
-our printers. Before updating the app, test both printers with synthetic labels,
-confirm completion/readiness and stock mismatch handling, and inspect the labels.
+These tests do not establish physical print quality. Real hardware results are
+recorded below; other models still require their own validation. Before future
+updates, repeat synthetic labels, completion/readiness, and stock mismatch checks.
 Do not consume postage or reuse a customer shipping label for driver experiments.
+
+## Hardware validation: October 18 evening / October 19 UTC, 2026
+
+The fork was exercised on our QL-800 with 29×90 mm die-cut stock and QL-1110NWB
+with 102 mm continuous stock. Exclusive probe ownership was enforced by stopping
+one idle worker at a time, waiting for its pod to exit, then restoring it after
+each experiment. The temporary probe pod was removed afterward.
+
+- Four initial labels confirmed both models' start/completion/readiness sequences.
+- Two further shipping labels held quality constant while comparing compression.
+  The raster payload fell from 116,857 to 18,319 bytes, about 84%. Total completion
+  time was similar; this establishes a transfer-size benefit, not faster printing.
+- After app rollout, two regular labels and one full-length synthetic shipping
+  label passed through the durable API queues. Each reached `completed` after
+  device acknowledgement. Wrong-stock jobs were rejected on both models, and
+  status queries worked alongside normal queue processing.
+- Nine labels in total were confirmed by the devices. Visual quality, barcode
+  scanning, and ruler measurements have not been independently confirmed.
+- Sanitized raw replies from the initial probes are retained as hardware-free
+  regression fixtures in `tests/fixtures/`. Full private traces remain outside Git
+  under `~/.local/share/brother-ql-tests/` on the operator's Mac.
+
+For a future controlled probe, first ensure no other process owns the USB device:
+
+```sh
+# Status only; provide the actual device identifier. Output must be a new file.
+.venv/bin/python tools/hardware_probe.py --model QL-800 \
+  --identifier usb://0x04f9:0x209b --output /tmp/ql800-check.json
+# Adding --print explicitly consumes two synthetic labels and never retries them.
+```
+
+The probe validates the model and stock before sending raster data, records a report
+even on failures, and requires a new output filename to prevent accidental reuse.
+It is an experiment utility, not a substitute for a durable production job queue.
 
 ## Brother software investigation
 

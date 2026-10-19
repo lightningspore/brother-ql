@@ -12,7 +12,9 @@ from test_queue import Transport
 
 class HardwareReplayTests(unittest.TestCase):
     def test_captured_ql800_and_ql1110_two_page_sequences(self):
-        for path in Path(__file__).with_name('fixtures').glob('*.json'):
+        fixtures = list(Path(__file__).with_name('fixtures').glob('*.json'))
+        self.assertEqual(len(fixtures), 2, 'Both hardware fixtures must be present')
+        for path in fixtures:
             fixture = json.loads(path.read_text())
             replies = [bytes.fromhex(h) for h in fixture['replies']]
             for raw in replies:
