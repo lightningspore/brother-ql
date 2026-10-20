@@ -249,4 +249,8 @@ ALL_MODELS = [
 
 class ModelsManager(ElementsManager):
     DEFAULT_ELEMENTS = copy.copy(ALL_MODELS)
-    ELEMENTS_NAME = 'model'
+    ELEMENT_NAME = 'model'
+
+    def get_model_by_identifier(self, identifier):
+        """Look up a model, raising ValueError for an unknown identifier."""
+        return self.get_element_by_identifier(identifier)

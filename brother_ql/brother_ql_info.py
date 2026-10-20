@@ -2,7 +2,7 @@
 
 import argparse
 
-from brother_ql.devicedependent import models, label_sizes, label_type_specs, DIE_CUT_LABEL, ENDLESS_LABEL, ROUND_DIE_CUT_LABEL
+from brother_ql.devicedependent import models, label_sizes, label_type_specs, DIE_CUT_LABEL, ENDLESS_LABEL, ROUND_DIE_CUT_LABEL, PTOUCH_ENDLESS_LABEL
 
 def main():
     parser = argparse.ArgumentParser()
@@ -27,12 +27,15 @@ def main():
             if s['kind'] == DIE_CUT_LABEL:
                 label_descr = "(%d x %d mm^2)"  % s['tape_size']
                 dots_printable = "{0:4d} x {1:4d}".format(*s['dots_printable'])
-            if s['kind'] == ENDLESS_LABEL:
+            elif s['kind'] == ENDLESS_LABEL:
                 label_descr = "(%d mm endless)" % s['tape_size'][0]
                 dots_printable = "{0:4d}".format(*s['dots_printable'])
-            if s['kind'] == ROUND_DIE_CUT_LABEL:
+            elif s['kind'] == ROUND_DIE_CUT_LABEL:
                 label_descr = "(%d mm diameter, round)" % s['tape_size'][0]
                 dots_printable = "{0:4d} x {1:4d}".format(*s['dots_printable'])
+            elif s['kind'] == PTOUCH_ENDLESS_LABEL:
+                label_descr = "(%d mm P-touch endless)" % s['tape_size'][0]
+                dots_printable = "{0:4d}".format(*s['dots_printable'])
             print(fmt.format(label_size=label_size, label_descr=label_descr, dots_printable=dots_printable))
 
 if __name__ == "__main__": main()

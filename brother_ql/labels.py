@@ -64,7 +64,7 @@ class Label(object):
         """
         Method to determine if certain label can be printed by the specified printer model.
         """
-        if self.restricted_to_models and model not in models: return False
+        if self.restricted_to_models and model not in self.restricted_to_models: return False
         else: return True
 
     @property
@@ -91,7 +91,7 @@ ALL_LABELS = (
   Label("62",     ( 62,   0), FormFactor.ENDLESS,       ( 732,    0), ( 696,    0),  12 , feed_margin=35),
   Label("62red",  ( 62,   0), FormFactor.ENDLESS,       ( 732,    0), ( 696,    0),  12 , feed_margin=35, color=Color.BLACK_RED_WHITE),
   Label("102",    (102,   0), FormFactor.ENDLESS,       (1200,    0), (1164,    0),  12 , feed_margin=35, restricted_to_models=['QL-1050', 'QL-1060N', 'QL-1100', 'QL-1110NWB', 'QL-1115NWB']),
-  Label("103",    (104,   0), FormFactor.ENDLESS,       (1224,    0), (1200,    0),  12 , feed_margin=35, restricted_to_models=['QL-1100', 'QL-1110NWB']),
+  Label("103",    (104,   0), FormFactor.ENDLESS,       (1224,    0), (1200,    0),  12 , feed_margin=35, restricted_to_models=['QL-1050', 'QL-1060N', 'QL-1100', 'QL-1110NWB', 'QL-1115NWB']),
   Label("104",    (104,   0), FormFactor.ENDLESS,       (1227,    0), (1200,    0),  -8 , feed_margin=35, restricted_to_models=['QL-1050', 'QL-1060N', 'QL-1100', 'QL-1110NWB', 'QL-1115NWB']),
   Label("17x54",  ( 17,  54), FormFactor.DIE_CUT,       ( 201,  636), ( 165,  566),   0 ),
   Label("17x87",  ( 17,  87), FormFactor.DIE_CUT,       ( 201, 1026), ( 165,  956),   0 ),
@@ -122,3 +122,7 @@ ALL_LABELS = (
 class LabelsManager(ElementsManager):
     DEFAULT_ELEMENTS = copy.copy(ALL_LABELS)
     ELEMENT_NAME = "label"
+
+    def get_label_by_identifier(self, identifier):
+        """Look up a label, raising ValueError for an unknown identifier."""
+        return self.get_element_by_identifier(identifier)

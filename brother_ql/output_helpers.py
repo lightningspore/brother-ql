@@ -1,7 +1,7 @@
 import logging
 
 from brother_ql.devicedependent import label_type_specs
-from brother_ql.devicedependent import DIE_CUT_LABEL, ENDLESS_LABEL, ROUND_DIE_CUT_LABEL
+from brother_ql.devicedependent import DIE_CUT_LABEL, ENDLESS_LABEL, ROUND_DIE_CUT_LABEL, PTOUCH_ENDLESS_LABEL
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ def textual_label_description(labels_to_include):
         s = label_type_specs[label_size]
         if s['kind'] in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
             dp_fmt = "{0:4d} x {1:4d}"
-        elif s['kind'] == ENDLESS_LABEL:
+        elif s['kind'] in (ENDLESS_LABEL, PTOUCH_ENDLESS_LABEL):
             dp_fmt = "{0:4d}"
         else:
             dp_fmt = " - unknown - "
