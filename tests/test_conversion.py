@@ -22,7 +22,7 @@ class ConversionTests(unittest.TestCase):
                                     ('QL-1110NWB', '102', 1164)]:
             for compress in (False, True):
                 with self.subTest(model=model, compress=compress):
-                    image = Image.new('RGB', (width, 991 if label == '29x90' else 200), 'white')
+                    image = Image.new('RGB', (width, 991 if label == '29x90' else 301), 'white')
                     image.paste('black', (10, 10, 100, 100))
                     data = convert(BrotherQLRaster(model), [image], label,
                                    compress=compress)
@@ -44,7 +44,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_compression_preserves_every_raster_row_for_both_models(self):
         for model, label, width, height in [('QL-800', '29x90', 306, 991),
-                                           ('QL-1110NWB', '102', 1164, 200)]:
+                                           ('QL-1110NWB', '102', 1164, 301)]:
             image = Image.new('RGB', (width, height), 'white')
             image.paste('black', (7, 11, 150, 100))
             rows = []

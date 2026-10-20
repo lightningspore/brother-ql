@@ -239,6 +239,18 @@ class BrotherQLRaster(object):
         if image.size[0] != self.get_pixel_width():
             fmt = 'Wrong pixel width: {}, expected {}'
             raise BrotherQLRasterError(fmt.format(image.size[0], self.get_pixel_width()))
+        # Model limits describe continuous tape at normal feed resolution.
+        # Fixed-size media has its own printable dimensions (checked by convert).
+        if getattr(self, '_mtype', None) != b'\x0b':
+            minimum, maximum = min_max_length_dots[self.model]
+            scale = 2 if self.dpi_600 else 1
+            minimum, maximum = minimum * scale, maximum * scale
+            if not minimum <= image.height <= maximum:
+                raise BrotherQLRasterError(
+                    f"Invalid raster length for {self.model}: {image.height} rows; "
+                    f"expected {minimum}..{maximum} rows "
+                    f"at {'600' if self.dpi_600 else '300'} dpi feed resolution."
+                )
         images = [image]
         if second_image:
             if image.size != second_image.size:
