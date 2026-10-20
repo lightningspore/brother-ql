@@ -60,7 +60,9 @@ Queue objects are not thread-safe.
 
 ## Development and validation
 
-Python 3.9 or newer is required. From this repository:
+Python 3.9 or newer is required. CI covers every released minor version from
+3.9 through 3.15, including tests against the built wheel outside the source tree.
+From this repository:
 
 ```sh
 uv venv --python 3.13
@@ -79,6 +81,52 @@ These tests do not establish physical print quality. Real hardware results are
 recorded below; other models still require their own validation. Before future
 updates, repeat synthetic labels, completion/readiness, and stock mismatch checks.
 Do not consume postage or reuse a customer shipping label for driver experiments.
+
+## Label length validation
+
+Continuous tape raster heights must fall within the model's configured
+`min_max_length_dots` bounds. These bounds use normal feed resolution; `dpi_600`
+doubles both limits. Validation runs on the final raster after rotation/resizing,
+before adding raster bytes. Invalid lengths raise `BrotherQLRasterError` rather
+than being sent. For example, QL-1110NWB accepts 301–35434 rows at normal resolution.
+Fixed-size and round labels keep their stock-specific printable dimensions, checked
+by the converter; continuous-tape minimums do not apply to them. Low-level callers
+must set `mtype = 0x0B` for fixed-size media before adding raster data.
+The resolution distinction follows [Brother's QL-800 raster reference, §4.3.4](https://download.brother.com/welcome/docp100278/cv_ql800_eng_raster_101.pdf).
+Existing model limits are retained; this change does not establish new hardware limits.
+
+## JSON catalog output
+
+```sh
+brother_ql info models --json
+brother_ql info labels --json
+```
+
+Each command writes one JSON array to stdout and does not connect to hardware.
+Without `--json`, the existing human-readable output remains the default.
+Records use the identifiers accepted by the CLI. Consumers should look up records
+by `identifier`, allow additional fields, and not depend on record ordering.
+
+Model records contain `identifier`, `min_max_length_dots`, `min_max_feed`,
+`number_bytes_per_row`, `additional_offset_r`, `mode_setting`, `cutting`,
+`expanded_mode`, `compression_support`, `two_color`, `num_invalidate_bytes`,
+`series_code`, `model_code`, and `product_id`. Ranges are two-element arrays;
+hardware codes are integers and capability fields are booleans. The length range
+uses normal feed resolution and applies to continuous tape.
+
+Label records contain `identifier`, `name`, `tape_size`, `form_factor`,
+`dots_total`, `dots_printable`, `offset_r`, `feed_margin`,
+`restricted_to_models`, and `color`. Sizes are `[width, length]` arrays;
+`tape_size` uses millimeters and dot dimensions use normal resolution.
+Zero length means continuous stock. `form_factor` and `color` use enum names
+(such as `ENDLESS` and `BLACK_WHITE`). An empty restriction list means no explicit
+model restriction, not a guarantee of physical compatibility with every printer.
+
+October 19 validation: all 56 tests pass in isolated environments on Python
+3.9.6, 3.10.16, 3.11.13, 3.12.10, 3.13.11, 3.14.7, and 3.15.0, with the validation extra.
+Wheel and source builds pass `twine check` on each version. Golden raster hashes
+and independent barcode decoding still pass. No physical prints or production
+rollout were performed for these changes.
 
 ## Hardware validation: October 18 evening / October 19 UTC, 2026
 

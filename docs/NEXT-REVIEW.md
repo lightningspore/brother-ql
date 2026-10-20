@@ -9,7 +9,11 @@ Keep the SporePrint base and port selected ideas. The most immediate driver gap 
 validation of model-specific raster length limits. The other fork also offers
 useful network, CLI, documentation, and release practices, but switching wholesale
 would drop compatibility and several fixes we already tested on hardware.
-This review changes no library behavior or live deployment.
+The original review changed no library behavior or live deployment.
+Follow-up implementation on October 19 added continuous-tape length validation
+with resolution scaling, retained stock-specific fixed-label checks, and added
+JSON model/label catalogs. See README for the output contract and validation log.
+Production still uses the earlier pinned revision until a separate rollout.
 
 ## Useful ideas to adopt
 

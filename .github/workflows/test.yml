@@ -6,7 +6,7 @@ jobs:
   test:
     strategy:
       matrix:
-        python: ['3.9', '3.11', '3.13', '3.14']
+        python: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15']
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -16,4 +16,12 @@ jobs:
       - run: python -m pip install ".[validation]" build
       - run: python -m unittest discover -s tests -v
       - run: python -m build
+      - name: Install and test the built wheel outside the source tree
+        run: |
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+          cp -R tests tools "$RUNNER_TEMP/"
+          cd "$RUNNER_TEMP"
+          python -m unittest discover -s tests -v
       - run: brother_ql --help
+      - run: brother_ql info models --json
+      - run: brother_ql info labels --json
