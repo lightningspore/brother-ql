@@ -132,7 +132,8 @@ prove the previously validated QL-800 and QL-1110 raster bytes did not change.
 Both live workers run alpha 1.4a2. One new QR/Code128 test label per printer completed
 through the normal app API. Independent ZXing decoding recovered both expected
 payloads from source images and the exact app-generated printer raster. The actual
-raster matched the verified raster byte for byte. Physical paper scanning is pending.
+raster matched the verified raster byte for byte. Sam subsequently confirmed that the QR codes scan on paper. A separate Code128
+hardware-scanner result has not been recorded.
 
 | Printer | QR payload | Code128 payload |
 | --- | --- | --- |
