@@ -1,6 +1,6 @@
 [project]
 name = "brother-ql-sporeprint"
-version = "1.4a1"
+version = "1.4a2"
 description = "SporePrint fork of the Brother QL raster driver"
 requires-python = ">=3.9"
 readme = "README.md"
@@ -46,6 +46,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Visualization",
     "Topic :: System :: Hardware :: Hardware Drivers",
 ]
+
+[project.optional-dependencies]
+validation = ["qrcode[pil]>=8", "python-barcode>=0.16", "zxing-cpp>=2.3"]
 
 [project.scripts]
 brother_ql = "brother_ql.cli:cli"
