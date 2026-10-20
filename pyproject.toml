@@ -48,7 +48,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-validation = ["qrcode[pil]>=8", "python-barcode>=0.16", "zxing-cpp>=2.3"]
+validation = ["qrcode[pil]>=8", "python-barcode>=0.16", "zxing-cpp>=2.3,<3; python_version < '3.10'", "zxing-cpp>=2.3; python_version >= '3.10'"]
 
 [project.scripts]
 brother_ql = "brother_ql.cli:cli"

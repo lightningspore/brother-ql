@@ -13,7 +13,7 @@ class BarcodeTests(unittest.TestCase):
                 self.assertEqual(report['source_decoded'],expected)
                 self.assertEqual(report['raster_decoded'],expected)
                 self.assertEqual(preview.height,image.height)
-                self.assertEqual(set(image.getdata()),{(0,0,0),(255,255,255)})
+                self.assertEqual(set(color for count,color in image.getcolors(maxcolors=3)),{(0,0,0),(255,255,255)})
 
     def test_missing_codes_fail_verification(self):
         with self.assertRaises(ValueError):
