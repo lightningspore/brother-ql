@@ -6,11 +6,12 @@ The starting point is latest upstream master, `5364d30e0ad088fa943642a0586381439
 including the changes after upstream's `1.4a0` alpha. Original authorship and GPLv3-or-later
 licensing are preserved. The upstream InvenTree repository is archived.
 
-The distribution is **`brother-ql-sporeprint`**, development version **1.4a2**.
+The distribution is **`brother-ql-sporeprint`**, stable version **1.4.0**.
 Python imports remain `brother_ql` and the CLI remains `brother_ql`.
 Use a separate virtual environment: this distribution shares import paths with
 `brother-ql` and `brother-ql-inventree`, so do not install them together.
-No release has been published to PyPI. Both live SporePrint workers now pin this
+Install the stable release with `pip install brother-ql-sporeprint==1.4.0`.
+Both live SporePrint workers still pin this
 fork at `3eea6fe44c2b8cbbe66214110e6019b14c187724` through their uv lockfile.
 The separate application repository owns the deployment and durable queues.
 
