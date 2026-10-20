@@ -96,8 +96,9 @@ each experiment. The temporary probe pod was removed afterward.
   device acknowledgement. Wrong-stock jobs were rejected on both models, and
   status queries worked alongside normal queue processing.
 - Nine labels in total were confirmed by the devices. Sam subsequently inspected
-  the output and reported that all labels printed well. Ruler measurements are
-  planned for tomorrow; barcode scanning remains unverified.
+  the output and reported that all labels printed well. On October 19, Sam checked
+  the scale with calipers and reported it was close to 10 mm. The exact reading
+  and printer were not specified; barcode scanning remains unverified.
 - Sanitized raw replies from the initial probes are retained as hardware-free
   regression fixtures in `tests/fixtures/`. Full private traces remain outside Git
   under `~/.local/share/brother-ql-tests/` on the operator's Mac.
