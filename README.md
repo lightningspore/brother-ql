@@ -155,6 +155,13 @@ Use the ordinary app queue for print acceptance, and decode the app's actual ras
 if testing its conversion path. The October 19 private acceptance artifacts are at
 `~/.local/share/brother-ql-tests/20261020T013639Z-barcodes/` on the operator Mac.
 
+## Comparison with brother_ql_next
+
+The [review of next 0.12.0](https://github.com/lightningspore/brother-ql/blob/master/docs/NEXT-REVIEW.md)
+records isolated probes, useful ideas, compatibility differences, and the proposed
+port order. Raster-length validation is the first priority, followed by JSON CLI
+output and release/documentation improvements. No wholesale base switch is planned.
+
 ## Brother software investigation
 
 Brother publishes a [QL-800 raster reference](https://download.brother.com/welcome/docp100278/cv_ql800_eng_raster_101.pdf)
