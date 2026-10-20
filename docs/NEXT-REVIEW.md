@@ -73,7 +73,8 @@ The code comparison and the commit links above are the durable reference.
 2. Add stable JSON model/stock output and public usage/API documentation.
 3. Prepare PyPI Trusted Publishing as `brother-ql-sporeprint`, the chosen name.
    `brother-ql-next` belongs to the reviewed project. Our wheel and source archive
-   passed twine checks, but no SporePrint PyPI release or publisher is configured.
+   passed twine checks. No SporePrint PyPI release has been published; account-side
+   publisher configuration has not been verified.
 4. Add IPv6 and network connection cleanup/timeouts when pursuing network printing.
 
 The other project has defects that could be useful upstream contributions. No
