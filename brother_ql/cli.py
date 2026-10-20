@@ -2,6 +2,8 @@
 
 # Python standard library
 import logging
+import json
+from attr import asdict
 import os
 from urllib.parse import urlparse
 
@@ -11,6 +13,7 @@ import click
 # imports from this very package
 from brother_ql.devicedependent import models, label_sizes, label_type_specs, DIE_CUT_LABEL, ENDLESS_LABEL, ROUND_DIE_CUT_LABEL
 from brother_ql.models import ModelsManager
+from brother_ql.labels import LabelsManager
 from brother_ql.backends import available_backends, backend_factory
 
 
@@ -87,20 +90,35 @@ def info(ctx, *args, **kwargs):
     """ list available labels, models etc. """
 
 @info.command(name='models')
+@click.option('--json', 'json_output', is_flag=True, help='Output model records as JSON.')
 @click.pass_context
 def models_cmd(ctx, *args, **kwargs):
     """
     List the choices for --model
     """
+    if kwargs.get('json_output'):
+        click.echo(json.dumps([asdict(m) for m in ModelsManager().iter_elements()], sort_keys=True))
+        return
     print('Supported models:')
     for model in models: print(" " + model)
 
 @info.command()
+@click.option('--json', 'json_output', is_flag=True, help='Output label records as JSON.')
 @click.pass_context
 def labels(ctx, *args, **kwargs):
     """
     List the choices for --label
     """
+    if kwargs.get('json_output'):
+        records = []
+        for label in LabelsManager().iter_elements():
+            record = asdict(label)
+            record['form_factor'] = label.form_factor.name
+            record['color'] = label.color.name
+            record['name'] = label.name
+            records.append(record)
+        click.echo(json.dumps(records, sort_keys=True))
+        return
     from brother_ql.output_helpers import textual_label_description
     print(textual_label_description(label_sizes))
 
