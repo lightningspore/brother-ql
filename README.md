@@ -6,12 +6,12 @@ The starting point is latest upstream master, `5364d30e0ad088fa943642a0586381439
 including the changes after upstream's `1.4a0` alpha. Original authorship and GPLv3-or-later
 licensing are preserved. The upstream InvenTree repository is archived.
 
-The distribution is **`brother-ql-sporeprint`**, development version **1.4a1**.
+The distribution is **`brother-ql-sporeprint`**, development version **1.4a2**.
 Python imports remain `brother_ql` and the CLI remains `brother_ql`.
 Use a separate virtual environment: this distribution shares import paths with
 `brother-ql` and `brother-ql-inventree`, so do not install them together.
 No release has been published to PyPI. Both live SporePrint workers now pin this
-fork at `5c91577c0ca7e5d8c974e5bb67a3e568512f651f` through their uv lockfile.
+fork at `3eea6fe44c2b8cbbe66214110e6019b14c187724` through their uv lockfile.
 The separate application repository owns the deployment and durable queues.
 
 ## Improvements in this fork
@@ -64,7 +64,7 @@ Python 3.9 or newer is required. From this repository:
 
 ```sh
 uv venv --python 3.13
-uv pip install --python .venv/bin/python -e . build
+uv pip install --python .venv/bin/python -e '.[validation]' build
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python -m build
 .venv/bin/brother_ql --version
@@ -115,6 +115,44 @@ For a future controlled probe, first ensure no other process owns the USB device
 The probe validates the model and stock before sending raster data, records a report
 even on failures, and requires a new output filename to prevent accidental reuse.
 It is an experiment utility, not a substitute for a durable production job queue.
+
+## Original upstream comparison and barcode follow-up
+
+On October 19, 2026, original upstream `pklaus/brother_ql` at `0dee94b` was
+compared with this fork. QL-1110 family support, DK-1234, Pillow compatibility, and
+the QL-8xx 400-byte invalidate sequence already existed in the InvenTree lineage.
+
+Selected ports from original commits `2fbd142`, `4181dec`, `0dee94b`, and `e61652e`
+add model/label lookup methods, repair the label compatibility check, extend `103`
+stock compatibility to all wide QL models, improve invalid-input CLI errors, and
+correct P-touch label descriptions. The `devicedependent` compatibility API,
+InvenTree hardware IDs, extra devices, and extra stocks remain. Regression tests
+prove the previously validated QL-800 and QL-1110 raster bytes did not change.
+
+Both live workers run alpha 1.4a2. One new QR/Code128 test label per printer completed
+through the normal app API. Independent ZXing decoding recovered both expected
+payloads from source images and the exact app-generated printer raster. The actual
+raster matched the verified raster byte for byte. Physical paper scanning is pending.
+
+| Printer | QR payload | Code128 payload |
+| --- | --- | --- |
+| QL-800 | `SPOREPRINT-QR-800-01` | `SP800001` |
+| QL-1110NWB | `SPOREPRINT-QR-1110-01` | `SP1110001` |
+
+With the nine earlier test labels, 11 physical print requests have been confirmed
+by the devices. The library now has 50 passing tests across Python 3.9, 3.11, 3.13,
+and 3.14. Barcode tools are optional dependencies; production does not need them.
+Generate a new artifact directory with:
+
+```sh
+.venv/bin/python tools/barcode_labels.py --output /tmp/new-barcode-check
+```
+
+This command generates source PNGs, reconstructed raster PNGs, and decoder results;
+it does not print. Modules and quiet zones use integer pixels without resampling.
+Use the ordinary app queue for print acceptance, and decode the app's actual raster
+if testing its conversion path. The October 19 private acceptance artifacts are at
+`~/.local/share/brother-ql-tests/20261020T013639Z-barcodes/` on the operator Mac.
 
 ## Brother software investigation
 
